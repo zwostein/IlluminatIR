@@ -129,6 +129,7 @@ bool modulator_set( uint32_t freq )
 		return false;
 	}
 	OCR1A = raw;
+//	OCR1B = raw;
 	return true;
 }
 
@@ -157,8 +158,10 @@ void modulator_init( uint32_t initial_freq )
 	       ;
 	TCCR1A = 0
 	       | _BV(COM1A0) // Toggle OC1A (PB5) on compare match.
+	       | _BV(COM1B0) // Toggle OC1B (PB6) on compare match.
 	       ;
 	DDRB |= _BV(PB5);  // Modulator pin as output
+	DDRB |= _BV(PB6);  // Modulator pin as output
 }
 
 
@@ -374,7 +377,7 @@ static bool updateLedValues( void )
 			checked += nextDiff;
 		}
 		size_t blockStart = nextDiff;
-		
+
 		int nextGap = getNextGap( ledValues, ledValues_prev, blockStart, ILLUMINATIR_MAX_CHANNELS, 3 );
 //  		fprintf_P( &usb, PSTR("\tgetNextGap: %d\n"), nextGap );
 		size_t blockEnd = 0;
@@ -384,9 +387,9 @@ static bool updateLedValues( void )
 			blockEnd = ILLUMINATIR_OFFSETARRAY_MAX_VALUES;
 		else
 			blockEnd = nextGap;
-		
+
 		size_t blockLen = blockEnd-blockStart;
-		
+
 //  		fprintf_P( &usb, PSTR("\tblockStart: %u, blockEnd:%u\n"), blockStart, blockEnd );
 		uint8_t cobsPacket[ILLUMINATIR_MAX_COBSPACKET_SIZE];
 		uint8_t cobsPacket_size = sizeof(cobsPacket);
@@ -398,9 +401,9 @@ static bool updateLedValues( void )
 		if( sendPacket( cobsPacket, cobsPacket_size ) < 0 )
 			return false; // packet not sent
 		sendSync();
-		
+
 		memcpy( &ledValues_prev[blockStart], &ledValues[blockStart], blockLen );
-		
+
 		updateStart = blockEnd;
 		if( updateStart >= ILLUMINATIR_MAX_CHANNELS )
 			updateStart -= ILLUMINATIR_MAX_CHANNELS;
@@ -423,7 +426,7 @@ int main( void )
 	char line[256] = {0};
 	uint8_t line_pos = 0;
 	bool line_ignore = false;
-	
+
 	uint8_t ledValues_scrubbingPos = 0;
 
 	while( true )
@@ -452,7 +455,7 @@ int main( void )
 
 		// HID
 		HID_Device_USBTask( &Generic_HID_Interface );
-		
+
 		// Serial
 		int16_t rec = fgetc( &usb ); // Must throw away unused bytes from USB host, or it will lock up while waiting for the device
 		if( rec >= 0 && rec != '\r' )
