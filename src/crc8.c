@@ -41,10 +41,12 @@ static const uint8_t crc8_table[] PROGMEM = {
 // test code for an example of the proper usage.
 uint8_t crc8( const uint8_t * data, size_t data_size, uint8_t crc )
 {
-	if( data == NULL )
+	if( data == NULL ) {
 		return CRC8_INITIAL_SEED;
+	}
 	const uint8_t * end = data + data_size;
-	while( data < end )
+	while( data < end ) {
 		crc = pgm_read_byte(&crc8_table[crc ^ *(data++)]);
+	}
 	return crc;
 }

@@ -1,6 +1,19 @@
-/** \file
+/*
+ * IlluminatIR
+ * Copyright (C) 2021  zwostein
  *
- *  Main source file for IlluminatIR.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "config.h"
@@ -32,20 +45,19 @@
  *  within a device can be differentiated from one another.
  */
 USB_ClassInfo_HID_Device_t Generic_HID_Interface =
-	{
-		.Config =
+{
+	.Config = {
+		.InterfaceNumber        = INTERFACE_ID_GenericHID,
+		.ReportINEndpoint       =
 			{
-				.InterfaceNumber              = INTERFACE_ID_GenericHID,
-				.ReportINEndpoint             =
-					{
-						.Address              = GENERIC_IN_EPADDR,
-						.Size                 = GENERIC_EPSIZE,
-						.Banks                = 1,
-					},
-				.PrevReportINBuffer           = NULL/*PrevHIDReportBuffer*/,
-				.PrevReportINBufferSize       = 0/*sizeof(PrevHIDReportBuffer)*/,
+				.Address        = GENERIC_IN_EPADDR,
+				.Size           = GENERIC_EPSIZE,
+				.Banks          = 1,
 			},
-	};
+		.PrevReportINBuffer     = NULL/*PrevHIDReportBuffer*/,
+		.PrevReportINBufferSize = 0/*sizeof(PrevHIDReportBuffer)*/,
+	},
+};
 
 
 /** LUFA CDC Class driver interface configuration and state information. This structure is
@@ -53,30 +65,29 @@ USB_ClassInfo_HID_Device_t Generic_HID_Interface =
  *  within a device can be differentiated from one another.
  */
 USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface =
-	{
-		.Config =
+{
+	.Config = {
+		.ControlInterfaceNumber = INTERFACE_ID_CDC_CCI,
+		.DataINEndpoint         =
 			{
-				.ControlInterfaceNumber         = INTERFACE_ID_CDC_CCI,
-				.DataINEndpoint                 =
-					{
-						.Address                = CDC_TX_EPADDR,
-						.Size                   = CDC_TXRX_EPSIZE,
-						.Banks                  = 1,
-					},
-				.DataOUTEndpoint                =
-					{
-						.Address                = CDC_RX_EPADDR,
-						.Size                   = CDC_TXRX_EPSIZE,
-						.Banks                  = 1,
-					},
-				.NotificationEndpoint           =
-					{
-						.Address                = CDC_NOTIFICATION_EPADDR,
-						.Size                   = CDC_NOTIFICATION_EPSIZE,
-						.Banks                  = 1,
-					},
+				.Address        = CDC_TX_EPADDR,
+				.Size           = CDC_TXRX_EPSIZE,
+				.Banks          = 1,
 			},
-	};
+		.DataOUTEndpoint        =
+			{
+				.Address        = CDC_RX_EPADDR,
+				.Size           = CDC_TXRX_EPSIZE,
+				.Banks          = 1,
+			},
+		.NotificationEndpoint   =
+			{
+				.Address        = CDC_NOTIFICATION_EPADDR,
+				.Size           = CDC_NOTIFICATION_EPSIZE,
+				.Banks          = 1,
+			},
+	},
+};
 
 
 static volatile uint16_t iterationCounter = 0;
@@ -92,10 +103,11 @@ static FILE uart = FDEV_SETUP_STREAM( wrap_uart_putchar, NULL, _FDEV_SETUP_WRITE
 */
 int wrap_usb_putchar( char c, FILE * stream )
 {
-	if( !usb_ready )
+	(void) stream;
+	if( !usb_ready ) {
 		return -1;
-	switch( CDC_Device_SendByte( &VirtualSerial_CDC_Interface, c ) )
-	{
+	}
+	switch( CDC_Device_SendByte( &VirtualSerial_CDC_Interface, c ) ) {
 		case ENDPOINT_READYWAIT_NoError:
 			return 0;
 		default:
@@ -104,8 +116,10 @@ int wrap_usb_putchar( char c, FILE * stream )
 }
 int wrap_usb_getchar( FILE * stream )
 {
-	if( !usb_ready )
+	(void) stream;
+	if( !usb_ready ) {
 		return -1;
+	}
 	return CDC_Device_ReceiveByte( &VirtualSerial_CDC_Interface );
 }
 static FILE usb = FDEV_SETUP_STREAM( wrap_usb_putchar, wrap_usb_getchar, _FDEV_SETUP_RW );
@@ -115,17 +129,15 @@ static FILE usb = FDEV_SETUP_STREAM( wrap_usb_putchar, wrap_usb_getchar, _FDEV_S
 
 bool modulator_set( uint32_t freq )
 {
-	if( !freq )
-	{
+	if( !freq ) {
 		return false;
 	}
 	uint32_t raw = F_CPU / ( (uint32_t)freq * MODULATOR_CLK_DIV * 2 );
-	if( raw ) // also have to subtract one - but prevent wraparound
-	{
+	// also have to subtract one - but prevent wraparound
+	if( raw ) {
 		raw--;
 	}
-	if( raw > UINT16_MAX )
-	{
+	if( raw > UINT16_MAX ) {
 		return false;
 	}
 	OCR1A = raw;
@@ -217,14 +229,15 @@ typedef enum {
 
 int readHex_digit( char c )
 {
-	if( c >= '0' && c <= '9' )
+	if( c >= '0' && c <= '9' ) {
 		return c - '0';
-	else if( c >= 'a' && c <= 'f' )
+	} else if( c >= 'a' && c <= 'f' ) {
 		return c - 'a' + 0xa;
-	else if( c >= 'A' && c <= 'F' )
+	} else if( c >= 'A' && c <= 'F' ) {
 		return c - 'A' + 0xa;
-	else
+	} else {
 		return READHEX_ERROR_INVALID_CHAR;
+	}
 }
 
 int readHex_string( uint8_t * dst, size_t dst_size, const char * str, size_t str_len )
@@ -236,8 +249,7 @@ int readHex_string( uint8_t * dst, size_t dst_size, const char * str, size_t str
 	if( size > dst_size ) {
 		return READHEX_ERROR_DESTINATION_TOO_SMALL;
 	}
-	for( uint8_t i = 0; i < str_len; i++ )
-	{
+	for( uint8_t i = 0; i < str_len; i++ ) {
 		uint8_t j = i/2;
 		int ret = readHex_digit( str[i] );
 		if( ret < 0 ) {
@@ -330,29 +342,29 @@ static size_t  ledValues_changed = 0; // index of the last index that changed + 
 
 static int getNextDiff( const uint8_t * a, const uint8_t * b, size_t from, size_t to )
 {
-	for( ; from < to; from++ )
-	{
-		if( a[from] != b[from] )
+	for( ; from < to; from++ ) {
+		if( a[from] != b[from] ) {
 			return from;
+		}
 	}
 	return -1;
 }
 
 static int getNextGap( const uint8_t * a, const uint8_t * b, size_t from, size_t to, size_t min )
 {
-	if( min == 0 )
+	if( min == 0 ) {
 		min = 1;
+	}
 	size_t min_left = min;
-	for( ; from < to; from++ )
-	{
-		if( a[from] == b[from] )
-		{
+	for( ; from < to; from++ ) {
+		if( a[from] == b[from] ) {
 			min_left--;
-			if( min_left == 0 )
+			if( min_left == 0 ) {
 				return from - min + 1;
-		}
-		else
+			}
+		} else {
 			min_left = min;
+		}
 	}
 	return -1;
 }
@@ -362,13 +374,11 @@ static bool updateLedValues( void )
 	static size_t updateStart = 0;
 	size_t checked = 0;
 // 	fprintf_P( &usb, PSTR("updateLedValues:\n") );
-	while( checked < ILLUMINATIR_MAX_CHANNELS )
-	{
+	while( checked < ILLUMINATIR_MAX_CHANNELS ) {
 //  		fprintf_P( &usb, PSTR("\tupdateStart: %u\n"), updateStart );
 		int nextDiff = getNextDiff( ledValues, ledValues_prev, updateStart, ILLUMINATIR_MAX_CHANNELS );
 //  		fprintf_P( &usb, PSTR("\tnextDiff: %d\n"), nextDiff );
-		if( nextDiff < 0 )
-		{
+		if( nextDiff < 0 ) {
 			checked += ILLUMINATIR_MAX_CHANNELS-updateStart;
 			nextDiff = getNextDiff( ledValues, ledValues_prev, 0, updateStart );
 //  			fprintf_P( &usb, PSTR("\tnextDiff2: %d\n"), nextDiff );
@@ -381,12 +391,13 @@ static bool updateLedValues( void )
 		int nextGap = getNextGap( ledValues, ledValues_prev, blockStart, ILLUMINATIR_MAX_CHANNELS, 3 );
 //  		fprintf_P( &usb, PSTR("\tgetNextGap: %d\n"), nextGap );
 		size_t blockEnd = 0;
-		if( nextGap < 0 )
+		if( nextGap < 0 ) {
 			blockEnd = ILLUMINATIR_MAX_CHANNELS;
-		else if ( nextGap-blockStart > ILLUMINATIR_OFFSETARRAY_MAX_VALUES )
+		} else if ( nextGap-blockStart > ILLUMINATIR_OFFSETARRAY_MAX_VALUES ) {
 			blockEnd = ILLUMINATIR_OFFSETARRAY_MAX_VALUES;
-		else
+		} else {
 			blockEnd = nextGap;
+		}
 
 		size_t blockLen = blockEnd-blockStart;
 
@@ -398,15 +409,17 @@ static bool updateLedValues( void )
 			fprintf_P( &usb, PSTR("Could not build packet: %S\n"), illuminatIr_error_toProgString(err) );
 			return false;
 		}
-		if( sendPacket( cobsPacket, cobsPacket_size ) < 0 )
+		if( sendPacket( cobsPacket, cobsPacket_size ) < 0 ) {
 			return false; // packet not sent
+		}
 		sendSync();
 
 		memcpy( &ledValues_prev[blockStart], &ledValues[blockStart], blockLen );
 
 		updateStart = blockEnd;
-		if( updateStart >= ILLUMINATIR_MAX_CHANNELS )
+		if( updateStart >= ILLUMINATIR_MAX_CHANNELS ) {
 			updateStart -= ILLUMINATIR_MAX_CHANNELS;
+		}
 		checked += blockLen;
 // 		fprintf_P( &usb, PSTR("\tchecked: %u\n"), checked );
 	}
@@ -429,10 +442,8 @@ int main( void )
 
 	uint8_t ledValues_scrubbingPos = 0;
 
-	while( true )
-	{
-		if( !iterationCounter )
-		{
+	while( true ) {
+		if( !iterationCounter ) {
 			fprintf_P( &usb, PSTR("IlluminatIR.\n") );
 
 			for( uint8_t i = 0; i < LEDVALUE_SCRUBBING_SIZE; i++ ) {
@@ -445,10 +456,8 @@ int main( void )
 			}
 			ledValues_changed = LEDVALUE_SCRUBBING_SIZE;
 		}
-		if( ledValues_changed )
-		{
-			if( updateLedValues() )
-			{
+		if( ledValues_changed ) {
+			if( updateLedValues() ) {
 				ledValues_changed = 0;
 			}
 		}
@@ -458,12 +467,9 @@ int main( void )
 
 		// Serial
 		int16_t rec = fgetc( &usb ); // Must throw away unused bytes from USB host, or it will lock up while waiting for the device
-		if( rec >= 0 && rec != '\r' )
-		{
-			if( rec == '\n' )
-			{
-				if( !line_ignore )
-				{
+		if( rec >= 0 && rec != '\r' ) {
+			if( rec == '\n' ) {
+				if( !line_ignore ) {
 					assert( line_pos < sizeof(line)-1 );
 					line[line_pos] = 0;
 					fprintf_P( &usb, PSTR("Input line: \"%s\"\n"), line );
@@ -472,8 +478,8 @@ int main( void )
 				line_pos = 0;
 				line_ignore = false;
 			} else {
-				if( line_pos >= sizeof(line)-2 ) // must be space left for received character + null byte
-				{
+				// must be space left for received character + null byte
+				if( line_pos >= sizeof(line)-2 ) {
 					fprintf_P( &usb, PSTR("Input line overflow!\n") );
 					line_ignore = true;
 				} else {
@@ -492,21 +498,21 @@ int main( void )
 
 
 /** Event handler for the library USB Connection event. */
-void EVENT_USB_Device_Connect(void)
+void EVENT_USB_Device_Connect( void )
 {
 	//LEDs_SetAllLEDs(LEDMASK_USB_ENUMERATING);
 }
 
 
 /** Event handler for the library USB Disconnection event. */
-void EVENT_USB_Device_Disconnect(void)
+void EVENT_USB_Device_Disconnect( void )
 {
 	//LEDs_SetAllLEDs(LEDMASK_USB_NOTREADY);
 }
 
 
 /** Event handler for the library USB Configuration Changed event. */
-void EVENT_USB_Device_ConfigurationChanged(void)
+void EVENT_USB_Device_ConfigurationChanged( void )
 {
 	bool ConfigSuccess = true;
 
@@ -520,17 +526,17 @@ void EVENT_USB_Device_ConfigurationChanged(void)
 
 
 /** Event handler for the library USB Control Request reception event. */
-void EVENT_USB_Device_ControlRequest(void)
+void EVENT_USB_Device_ControlRequest( void )
 {
-	HID_Device_ProcessControlRequest(&Generic_HID_Interface);
-	CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
+	HID_Device_ProcessControlRequest( &Generic_HID_Interface);
+	CDC_Device_ProcessControlRequest( &VirtualSerial_CDC_Interface );
 }
 
 
 /** Event handler for the USB device Start Of Frame event. */
-void EVENT_USB_Device_StartOfFrame(void)
+void EVENT_USB_Device_StartOfFrame( void )
 {
-	HID_Device_MillisecondElapsed(&Generic_HID_Interface);
+	HID_Device_MillisecondElapsed( &Generic_HID_Interface );
 }
 
 
@@ -539,7 +545,7 @@ void EVENT_USB_Device_StartOfFrame(void)
  *
  *  \param[in] CDCInterfaceInfo  Pointer to the CDC class interface configuration structure being referenced
  */
-void EVENT_CDC_Device_ControLineStateChanged(USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo)
+void EVENT_CDC_Device_ControLineStateChanged( USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo )
 {
 	/* You can get changes to the virtual CDC lines in this callback; a common
 	   use-case is to use the Data Terminal Ready (DTR) flag to enable and
@@ -551,10 +557,9 @@ void EVENT_CDC_Device_ControLineStateChanged(USB_ClassInfo_CDC_Device_t *const C
 }
 
 
-static const char * CDC_LineEncodingFormat_toString(uint8_t f)
+static const char * CDC_LineEncodingFormat_toString( uint8_t f )
 {
-	switch(f)
-	{
+	switch(f) {
 		case CDC_LINEENCODING_OneStopBit:          return "1";
 		case CDC_LINEENCODING_OneAndAHalfStopBits: return "1.5";
 		case CDC_LINEENCODING_TwoStopBits:         return "2";
@@ -563,10 +568,9 @@ static const char * CDC_LineEncodingFormat_toString(uint8_t f)
 }
 
 
-static const char * CDC_LineEncodingParity_toString(uint8_t p)
+static const char * CDC_LineEncodingParity_toString (uint8_t p )
 {
-	switch(p)
-	{
+	switch(p) {
 		case CDC_PARITY_None:  return "None";
 		case CDC_PARITY_Odd:   return "Odd";
 		case CDC_PARITY_Even:  return "Even";
@@ -577,7 +581,7 @@ static const char * CDC_LineEncodingParity_toString(uint8_t p)
 }
 
 
-void EVENT_CDC_Device_LineEncodingChanged(USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo)
+void EVENT_CDC_Device_LineEncodingChanged( USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo )
 {
 	fprintf_P( &usb, PSTR("Line encoding changed: %"PRIu32" Baud, %s Stopbits, %d Databits, %s Parity\n"),
 	           CDCInterfaceInfo->State.LineEncoding.BaudRateBPS,
@@ -597,12 +601,16 @@ void EVENT_CDC_Device_LineEncodingChanged(USB_ClassInfo_CDC_Device_t *const CDCI
  *
  *  \return Boolean \c true to force the sending of the report, \c false to let the library determine if it needs to be sent
  */
-bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
-                                         uint8_t* const ReportID,
-                                         const uint8_t ReportType,
-                                         void* ReportData,
-                                         uint16_t* const ReportSize)
+bool CALLBACK_HID_Device_CreateHIDReport( USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
+                                          uint8_t* const ReportID,
+                                          const uint8_t ReportType,
+                                          void* ReportData,
+                                          uint16_t* const ReportSize )
 {
+	(void) HIDInterfaceInfo;
+	(void) ReportID;
+	(void) ReportType;
+	(void) ReportData;
 	//uint8_t * ReportData = (uint8_t*)_ReportData;
 	*ReportSize = 0;
 	return false;
@@ -617,17 +625,17 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
  *  \param[in] ReportData  Pointer to a buffer where the received report has been stored
  *  \param[in] ReportSize  Size in bytes of the received HID report
  */
-void CALLBACK_HID_Device_ProcessHIDReport(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
-                                          const uint8_t ReportID,
-                                          const uint8_t ReportType,
-                                          const void* ReportData,
-                                          const uint16_t ReportSize)
+void CALLBACK_HID_Device_ProcessHIDReport( USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
+                                           const uint8_t ReportID,
+                                           const uint8_t ReportType,
+                                           const void* ReportData,
+                                           const uint16_t ReportSize )
 {
+	(void) HIDInterfaceInfo;
+	(void) ReportType;
 	//const uint8_t * ReportData = (uint8_t*)_ReportData;
-	switch( ReportID )
-	{
-		case 0x01:
-		{
+	switch( ReportID ) {
+		case 0x01: {
 			ledValues_changed = MIN( ReportSize, ILLUMINATIR_MAX_CHANNELS );
 			memcpy( ledValues, ReportData, ledValues_changed );
 			break;
