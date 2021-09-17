@@ -179,9 +179,8 @@ void modulator_init( uint32_t initial_freq )
 
 void SetupHardware( void )
 {
-	/* Disable watchdog if enabled by bootloader/fuses */
-	MCUSR &= ~(1 << WDRF);
-	wdt_disable();
+	MCUSR = 0;
+	wdt_enable( WDTO_2S );
 
 	/* Disable clock division */
 	clock_prescale_set(clock_div_1);
@@ -194,8 +193,9 @@ void SetupHardware( void )
 }
 
 
-#define PACKET_TX_AVAILABLE uart1_tx_available
-#define PACKET_TX uart1_putc
+#define PACKET_TX_ISEMPTY() (uart1_tx_available() >= UART_TX1_BUFFER_SIZE-1)
+#define PACKET_TX_AVAILABLE() uart1_tx_available()
+#define PACKET_TX(x) uart1_putc(x)
 
 int8_t sendPacket( const uint8_t * ptr, uint8_t size )
 {
@@ -277,6 +277,20 @@ void print_readHex_error( int err )
 }
 
 
+void wdtTrigger( void )
+{
+	unsigned i = 0;
+	while( true ) {
+		_delay_ms(1.0);
+		if( !(i % 100) ) {
+			printf_P( PSTR(".\n") );
+		}
+		USB_USBTask(); // too keep USB serial output alive until watchdog triggers
+		i++;
+	}
+}
+
+
 void parseLine( char * line )
 {
 	char * token = strtok( line, " \t" );
@@ -329,6 +343,13 @@ void parseLine( char * line )
 		int packet_size = readHex_string( packet, sizeof(packet), token, strlen( token ) );
 		if( packet_size < 0 ) { print_readHex_error( packet_size ); return; }
 		sendPacket( packet, packet_size );
+	} else if( !strcasecmp_P( token, PSTR("bootloader") ) ) {
+		printf_P( PSTR("Rebooting into Bootloader!\n") );
+		//NOTE: This is specific to the Arduino Caterina Bootloader! But other boards like the Pololu A-Star series might come with a compatible bootloader.
+		const uint16_t bootKey = 0x7777;
+		volatile uint16_t *const bootKeyPtr = (volatile uint16_t *)0x0800;
+		*bootKeyPtr = bootKey;
+		wdtTrigger();
 	} else {
 		fprintf_P( &usb, PSTR("Unknown command \"%s\"!\n"), token );
 		return;
@@ -444,8 +465,10 @@ int main( void )
 
 	while( true ) {
 		if( !iterationCounter ) {
-			fprintf_P( &usb, PSTR("IlluminatIR.\n") );
+			fprintf_P( &usb, PSTR("IlluminatIR\n") );
+		}
 
+		if( !ledValues_changed && PACKET_TX_ISEMPTY() ) {
 			for( uint8_t i = 0; i < LEDVALUE_SCRUBBING_SIZE; i++ ) {
 				ledValues_prev[ledValues_scrubbingPos]++;
 				ledValues_scrubbingPos++;
@@ -492,6 +515,7 @@ int main( void )
 
 		// finish iteration
 		USB_USBTask();
+		wdt_reset();
 		iterationCounter++;
 	}
 }
