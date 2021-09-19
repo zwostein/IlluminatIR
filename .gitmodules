@@ -1,6 +1,6 @@
 [submodule "ext/avr-uart"]
 	path = ext/avr-uart
 	url = https://github.com/zwostein/avr-uart.git
-[submodule "ext/cobs-c"]
-	path = ext/cobs-c
-	url = https://github.com/cmcqueen/cobs-c.git
+[submodule "ext/libilluminatir"]
+	path = ext/libilluminatir
+	url = https://github.com/zwostein/libilluminatir.git

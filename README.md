@@ -1,9 +1,9 @@
 # IlluminatIR
 
 IlluminatIR synchronizes lighting devices (and possibly other gadgets) via an infrared serial protocol.
-The infrared transmitter is connected to a host computer via USB and acts as a HID device.
 
 This is the firmware for ATmega32U4 microcontrollers implementing the transmitter.  
+The infrared transmitter is connected to a host computer via USB and acts as a HID device.
 It is based on [LUFA](https://fourwalledcubicle.com/LUFA.php).
 
 

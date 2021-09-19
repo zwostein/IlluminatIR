@@ -22,9 +22,9 @@ F_CPU        = 16000000
 F_USB        = $(F_CPU)
 OPTIMIZATION = s
 TARGET       = IlluminatIR
-SRC          = $(wildcard src/*.c) ext/avr-uart/uart.c ext/cobs-c/cobs.c $(LUFA_SRC_USB) $(LUFA_SRC_USBCLASS)
+SRC          = $(wildcard src/*.c) $(wildcard ext/libilluminatir/src/*.c) ext/avr-uart/uart.c $(LUFA_SRC_USB) $(LUFA_SRC_USBCLASS)
 LUFA_PATH    = ../lufa/LUFA
-CC_FLAGS     = -DUSE_LUFA_CONFIG_HEADER -Isrc/ -Iext/cobs-c/ -Iext/ -Wall -Wextra -DUSART1_ENABLED -DUART_TX1_BUFFER_SIZE=64 -DUART_RX1_BUFFER_SIZE=64
+CC_FLAGS     = -DUSE_LUFA_CONFIG_HEADER -Isrc/ -Iext/libilluminatir/include/ -Iext/ -Wall -Wextra -DUSART1_ENABLED -DUART_TX1_BUFFER_SIZE=64 -DUART_RX1_BUFFER_SIZE=64
 LD_FLAGS     = -Wl,-u,vfprintf -lprintf_flt -lm
 
 # Default target

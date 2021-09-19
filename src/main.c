@@ -18,10 +18,6 @@
 
 #include "config.h"
 #include "Descriptors.h"
-#include "crc8.h"
-#include "illuminatir.h"
-#include "cobs.h"
-#include "avr-uart/uart.h"
 
 #include <inttypes.h>
 #include <math.h>
@@ -35,6 +31,9 @@
 #include <LUFA/Drivers/Board/LEDs.h>
 #include <LUFA/Drivers/USB/USB.h>
 #include <LUFA/Platform/Platform.h>
+
+#include <avr-uart/uart.h>
+#include <illuminatir.h>
 
 
 /** Buffer to hold the previously generated HID report, for comparison purposes inside the HID class driver. */
@@ -122,7 +121,7 @@ int wrap_usb_getchar( FILE * stream )
 	}
 	return CDC_Device_ReceiveByte( &VirtualSerial_CDC_Interface );
 }
-static FILE usb = FDEV_SETUP_STREAM( wrap_usb_putchar, wrap_usb_getchar, _FDEV_SETUP_RW );
+static FILE usbCdc = FDEV_SETUP_STREAM( wrap_usb_putchar, wrap_usb_getchar, _FDEV_SETUP_RW );
 
 
 #define MODULATOR_CLK_DIV 1
@@ -190,6 +189,8 @@ void SetupHardware( void )
 	USB_Init();
 	modulator_init( INITIAL_MODULATION );
 	uart1_init( UART_BAUD_SELECT(INITIAL_UART_BAUDRATE, F_CPU) );
+	
+	stdout = stdin = &usbCdc;
 }
 
 
@@ -199,20 +200,20 @@ void SetupHardware( void )
 
 int8_t sendPacket( const uint8_t * ptr, uint8_t size )
 {
-	fprintf_P( &usb, PSTR("Sending: ") );
+	printf_P( PSTR("Sending: ") );
 	for( uint8_t i = 0; i < size; i++ ) {
-		fprintf( &usb, "%02x", (int)ptr[i] );
+		printf( "%02x", (int)ptr[i] );
 	}
-	fprintf( &usb, " ... " );
+	printf_P( PSTR(" ... ") );
 
 	if( size > PACKET_TX_AVAILABLE() ) {
-		fprintf_P( &usb, PSTR("Failed!\n") );
+		printf_P( PSTR("Failed!\n") );
 		return -1;
 	}
 	for( uint8_t i = 0; i < size; i++ ) {
 		PACKET_TX( ptr[i] );
 	}
-	fprintf_P( &usb, PSTR("Ok.\n") );
+	printf_P( PSTR("Ok.\n") );
 	return 0;
 }
 
@@ -270,9 +271,9 @@ int readHex_string( uint8_t * dst, size_t dst_size, const char * str, size_t str
 void print_readHex_error( int err )
 {
 	switch( err ) {
-		case READHEX_ERROR_ODD_LENGTH:            fprintf_P( &usb, PSTR("Odd number of hex digits!\n") );      break;
-		case READHEX_ERROR_DESTINATION_TOO_SMALL: fprintf_P( &usb, PSTR("Too much hex data!\n") );             break;
-		case READHEX_ERROR_INVALID_CHAR:          fprintf_P( &usb, PSTR("Invalid character in hex data!\n") ); break;
+		case READHEX_ERROR_ODD_LENGTH:            printf_P( PSTR("Odd number of hex digits!\n") );      break;
+		case READHEX_ERROR_DESTINATION_TOO_SMALL: printf_P( PSTR("Too much hex data!\n") );             break;
+		case READHEX_ERROR_INVALID_CHAR:          printf_P( PSTR("Invalid character in hex data!\n") ); break;
 	}
 }
 
@@ -294,51 +295,51 @@ void wdtTrigger( void )
 void parseLine( char * line )
 {
 	char * token = strtok( line, " \t" );
-	if( !token ) { fprintf_P( &usb, PSTR("No command given!\n") ); return; }
+	if( !token ) { printf_P( PSTR("No command given!\n") ); return; }
 	if( !strcasecmp_P( token, PSTR("set") ) ) {
 		token = strtok( NULL, "=: \t" );
-		if( !token ) { fprintf_P( &usb, PSTR("No variable given!\n") ); return; }
+		if( !token ) { printf_P( PSTR("No variable given!\n") ); return; }
 		if( !strcasecmp_P( token, PSTR("modulation_hz") ) ) {
 			token = strtok( NULL, "" );
-			if( !token ) { fprintf_P( &usb, PSTR("No value given!\n") ); return; }
+			if( !token ) { printf_P( PSTR("No value given!\n") ); return; }
 			uint32_t freq = INITIAL_MODULATION;
 			if( !sscanf( token, "%"PRIu32, &freq ) )
 			{
-				fprintf_P( &usb, PSTR("Failed to parse \"%s\" as a frequency in Hz!\n"), token );
+				printf_P( PSTR("Failed to parse \"%s\" as a frequency in Hz!\n"), token );
 				return;
 			}
 			if( modulator_set(freq) ) {
-				fprintf_P( &usb, PSTR("Modulating @ %"PRIu32"Hz\n"), freq );
+				printf_P( PSTR("Modulating @ %"PRIu32"Hz\n"), freq );
 			} else {
-				fprintf_P( &usb, PSTR("Failed to set modulator to %"PRIu32"Hz!\n"), freq );
+				printf_P( PSTR("Failed to set modulator to %"PRIu32"Hz!\n"), freq );
 				return;
 			}
 		} else {
-			fprintf_P( &usb, PSTR("Unknown variable \"%s\"!\n"), token );
+			printf_P( PSTR("Unknown variable \"%s\"!\n"), token );
 			return;
 		}
 	} else if( !strcasecmp_P( token, PSTR("sendconfig") ) ) {
 		char * key = strtok( NULL, " \t" );
-		if( !key ) { fprintf_P( &usb, PSTR("No config key given!\n") ); return; }
+		if( !key ) { printf_P( PSTR("No config key given!\n") ); return; }
 		char * values_hex = strtok( NULL, "" );
 		uint8_t values[16];
 		int values_size = readHex_string( values, sizeof(values), values_hex, strlen(values_hex) );
 		if( values_size < 0 ) { print_readHex_error( values_size ); return; }
-		uint8_t cobsPacket[ILLUMINATIR_MAX_COBSPACKET_SIZE];
+		uint8_t cobsPacket[ILLUMINATIR_COBS_ENCODE_DST_MAXSIZE(ILLUMINATIR_MAX_PACKET_SIZE)];
 		uint8_t cobsPacket_size = sizeof(cobsPacket);
-		illuminatIr_error_t err = IlluminatIr_build_config_toCobs( cobsPacket, &cobsPacket_size, key, strlen(key), values, values_size );
+		illuminatir_error_t err = illuminatir_cobs_build_config( cobsPacket, &cobsPacket_size, key, strlen(key), values, values_size );
 		if( err != ILLUMINATIR_ERROR_NONE ) {
-			fprintf_P( &usb, PSTR("Could not build packet: %S\n"), illuminatIr_error_toProgString(err) );
+			printf_P( PSTR("Could not build packet: %S\n"), illuminatir_error_toString_P(err) );
 			return;
 		}
 		if( sendPacket( cobsPacket, cobsPacket_size ) < 0 ) {
-			fprintf_P( &usb, PSTR("Could not send packet!\n") );
+			printf_P( PSTR("Could not send packet!\n") );
 			return;
 		}
 		sendSync();
 	} else if( !strcasecmp_P( token, PSTR("sendraw") ) ) {
 		token = strtok( NULL, "" );
-		if( !token ) { fprintf_P( &usb, PSTR("No raw hex data given!\n") ); return; }
+		if( !token ) { printf_P( PSTR("No raw hex data given!\n") ); return; }
 		uint8_t packet[32];
 		int packet_size = readHex_string( packet, sizeof(packet), token, strlen( token ) );
 		if( packet_size < 0 ) { print_readHex_error( packet_size ); return; }
@@ -351,7 +352,7 @@ void parseLine( char * line )
 		*bootKeyPtr = bootKey;
 		wdtTrigger();
 	} else {
-		fprintf_P( &usb, PSTR("Unknown command \"%s\"!\n"), token );
+		printf_P( PSTR("Unknown command \"%s\"!\n"), token );
 		return;
 	}
 }
@@ -394,15 +395,15 @@ static bool updateLedValues( void )
 {
 	static size_t updateStart = 0;
 	size_t checked = 0;
-// 	fprintf_P( &usb, PSTR("updateLedValues:\n") );
+// 	printf_P( PSTR("updateLedValues:\n") );
 	while( checked < ILLUMINATIR_MAX_CHANNELS ) {
-//  		fprintf_P( &usb, PSTR("\tupdateStart: %u\n"), updateStart );
+//  		printf_P( PSTR("\tupdateStart: %u\n"), updateStart );
 		int nextDiff = getNextDiff( ledValues, ledValues_prev, updateStart, ILLUMINATIR_MAX_CHANNELS );
-//  		fprintf_P( &usb, PSTR("\tnextDiff: %d\n"), nextDiff );
+//  		printf_P( PSTR("\tnextDiff: %d\n"), nextDiff );
 		if( nextDiff < 0 ) {
 			checked += ILLUMINATIR_MAX_CHANNELS-updateStart;
 			nextDiff = getNextDiff( ledValues, ledValues_prev, 0, updateStart );
-//  			fprintf_P( &usb, PSTR("\tnextDiff2: %d\n"), nextDiff );
+//  			printf_P( PSTR("\tnextDiff2: %d\n"), nextDiff );
 			if( nextDiff < 0 )
 				return true; // no differences
 			checked += nextDiff;
@@ -410,7 +411,7 @@ static bool updateLedValues( void )
 		size_t blockStart = nextDiff;
 
 		int nextGap = getNextGap( ledValues, ledValues_prev, blockStart, ILLUMINATIR_MAX_CHANNELS, 3 );
-//  		fprintf_P( &usb, PSTR("\tgetNextGap: %d\n"), nextGap );
+//  		printf_P( PSTR("\tgetNextGap: %d\n"), nextGap );
 		size_t blockEnd = 0;
 		if( nextGap < 0 ) {
 			blockEnd = ILLUMINATIR_MAX_CHANNELS;
@@ -422,12 +423,12 @@ static bool updateLedValues( void )
 
 		size_t blockLen = blockEnd-blockStart;
 
-//  		fprintf_P( &usb, PSTR("\tblockStart: %u, blockEnd:%u\n"), blockStart, blockEnd );
-		uint8_t cobsPacket[ILLUMINATIR_MAX_COBSPACKET_SIZE];
+//		printf_P( PSTR("\tblockStart: %u, blockEnd:%u\n"), blockStart, blockEnd );
+		uint8_t cobsPacket[ILLUMINATIR_COBS_ENCODE_DST_MAXSIZE(ILLUMINATIR_MAX_PACKET_SIZE)];
 		uint8_t cobsPacket_size = sizeof(cobsPacket);
-		illuminatIr_error_t err = IlluminatIr_build_offsetArray_toCobs( cobsPacket, &cobsPacket_size, blockStart, &ledValues[blockStart], blockLen );
+		illuminatir_error_t err = illuminatir_cobs_build_offsetArray( cobsPacket, &cobsPacket_size, blockStart, &ledValues[blockStart], blockLen );
 		if( err != ILLUMINATIR_ERROR_NONE ) {
-			fprintf_P( &usb, PSTR("Could not build packet: %S\n"), illuminatIr_error_toProgString(err) );
+			printf_P( PSTR("Could not build packet: %S\n"), illuminatir_error_toString_P(err) );
 			return false;
 		}
 		if( sendPacket( cobsPacket, cobsPacket_size ) < 0 ) {
@@ -442,7 +443,7 @@ static bool updateLedValues( void )
 			updateStart -= ILLUMINATIR_MAX_CHANNELS;
 		}
 		checked += blockLen;
-// 		fprintf_P( &usb, PSTR("\tchecked: %u\n"), checked );
+//		printf_P( PSTR("\tchecked: %u\n"), checked );
 	}
 	return true; // iterated once over every LED value
 }
@@ -455,7 +456,7 @@ int main( void )
 	GlobalInterruptEnable();
 
 	LEDs_SetAllLEDs( LEDS_NO_LEDS );
-	fprintf_P( &usb, PSTR("IlluminatIR powered on.\n") );
+	printf_P( PSTR("IlluminatIR powered on.\n") );
 
 	char line[256] = {0};
 	uint8_t line_pos = 0;
@@ -465,7 +466,7 @@ int main( void )
 
 	while( true ) {
 		if( !iterationCounter ) {
-			fprintf_P( &usb, PSTR("IlluminatIR\n") );
+			printf_P( PSTR("IlluminatIR\n") );
 		}
 
 		if( !ledValues_changed && PACKET_TX_ISEMPTY() ) {
@@ -489,13 +490,13 @@ int main( void )
 		HID_Device_USBTask( &Generic_HID_Interface );
 
 		// Serial
-		int16_t rec = fgetc( &usb ); // Must throw away unused bytes from USB host, or it will lock up while waiting for the device
+		int16_t rec = getchar(); // Must throw away unused bytes from USB host, or it will lock up while waiting for the device
 		if( rec >= 0 && rec != '\r' ) {
 			if( rec == '\n' ) {
 				if( !line_ignore ) {
 					assert( line_pos < sizeof(line)-1 );
 					line[line_pos] = 0;
-					fprintf_P( &usb, PSTR("Input line: \"%s\"\n"), line );
+					printf_P( PSTR("Input line: \"%s\"\n"), line );
 					parseLine( line );
 				}
 				line_pos = 0;
@@ -503,7 +504,7 @@ int main( void )
 			} else {
 				// must be space left for received character + null byte
 				if( line_pos >= sizeof(line)-2 ) {
-					fprintf_P( &usb, PSTR("Input line overflow!\n") );
+					printf_P( PSTR("Input line overflow!\n") );
 					line_ignore = true;
 				} else {
 					line[line_pos] = rec;
@@ -581,37 +582,37 @@ void EVENT_CDC_Device_ControLineStateChanged( USB_ClassInfo_CDC_Device_t *const 
 }
 
 
-static const char * CDC_LineEncodingFormat_toString( uint8_t f )
+static const char * CDC_LineEncodingFormat_toString_P( uint8_t f )
 {
 	switch(f) {
-		case CDC_LINEENCODING_OneStopBit:          return "1";
-		case CDC_LINEENCODING_OneAndAHalfStopBits: return "1.5";
-		case CDC_LINEENCODING_TwoStopBits:         return "2";
-		default:                                   return "?";
+		case CDC_LINEENCODING_OneStopBit:          return PSTR("1");
+		case CDC_LINEENCODING_OneAndAHalfStopBits: return PSTR("1.5");
+		case CDC_LINEENCODING_TwoStopBits:         return PSTR("2");
+		default:                                   return PSTR("?");
 	}
 }
 
 
-static const char * CDC_LineEncodingParity_toString (uint8_t p )
+static const char * CDC_LineEncodingParity_toString_P(uint8_t p )
 {
 	switch(p) {
-		case CDC_PARITY_None:  return "None";
-		case CDC_PARITY_Odd:   return "Odd";
-		case CDC_PARITY_Even:  return "Even";
-		case CDC_PARITY_Mark:  return "Mark";
-		case CDC_PARITY_Space: return "Space";
-		default:               return "?";
+		case CDC_PARITY_None:  return PSTR("None");
+		case CDC_PARITY_Odd:   return PSTR("Odd");
+		case CDC_PARITY_Even:  return PSTR("Even");
+		case CDC_PARITY_Mark:  return PSTR("Mark");
+		case CDC_PARITY_Space: return PSTR("Space");
+		default:               return PSTR("?");
 	}
 }
 
 
 void EVENT_CDC_Device_LineEncodingChanged( USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo )
 {
-	fprintf_P( &usb, PSTR("Line encoding changed: %"PRIu32" Baud, %s Stopbits, %d Databits, %s Parity\n"),
-	           CDCInterfaceInfo->State.LineEncoding.BaudRateBPS,
-	           CDC_LineEncodingFormat_toString(CDCInterfaceInfo->State.LineEncoding.CharFormat),
-	           (unsigned)CDCInterfaceInfo->State.LineEncoding.DataBits,
-	           CDC_LineEncodingParity_toString(CDCInterfaceInfo->State.LineEncoding.ParityType) );
+	printf_P( PSTR("Line encoding changed: %"PRIu32" Baud, %S Stopbits, %d Databits, %S Parity\n"),
+	          CDCInterfaceInfo->State.LineEncoding.BaudRateBPS,
+	          CDC_LineEncodingFormat_toString_P(CDCInterfaceInfo->State.LineEncoding.CharFormat),
+	          (unsigned)CDCInterfaceInfo->State.LineEncoding.DataBits,
+	          CDC_LineEncodingParity_toString_P(CDCInterfaceInfo->State.LineEncoding.ParityType) );
 }
 
 
