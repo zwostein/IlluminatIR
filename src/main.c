@@ -325,7 +325,7 @@ void parseLine( char * line )
 		uint8_t values[16];
 		int values_size = readHex_string( values, sizeof(values), values_hex, strlen(values_hex) );
 		if( values_size < 0 ) { print_readHex_error( values_size ); return; }
-		uint8_t cobsPacket[ILLUMINATIR_COBS_ENCODE_DST_MAXSIZE(ILLUMINATIR_MAX_PACKET_SIZE)];
+		uint8_t cobsPacket[ILLUMINATIR_COBS_PACKET_MAXSIZE];
 		uint8_t cobsPacket_size = sizeof(cobsPacket);
 		illuminatir_error_t err = illuminatir_cobs_build_config( cobsPacket, &cobsPacket_size, key, strlen(key), values, values_size );
 		if( err != ILLUMINATIR_ERROR_NONE ) {
@@ -415,8 +415,8 @@ static bool updateLedValues( void )
 		size_t blockEnd = 0;
 		if( nextGap < 0 ) {
 			blockEnd = ILLUMINATIR_MAX_CHANNELS;
-		} else if ( nextGap-blockStart > ILLUMINATIR_OFFSETARRAY_MAX_VALUES ) {
-			blockEnd = ILLUMINATIR_OFFSETARRAY_MAX_VALUES;
+		} else if ( nextGap-blockStart > ILLUMINATIR_OFFSETARRAY_MAXVALUES ) {
+			blockEnd = ILLUMINATIR_OFFSETARRAY_MAXVALUES;
 		} else {
 			blockEnd = nextGap;
 		}
@@ -424,7 +424,7 @@ static bool updateLedValues( void )
 		size_t blockLen = blockEnd-blockStart;
 
 //		printf_P( PSTR("\tblockStart: %u, blockEnd:%u\n"), blockStart, blockEnd );
-		uint8_t cobsPacket[ILLUMINATIR_COBS_ENCODE_DST_MAXSIZE(ILLUMINATIR_MAX_PACKET_SIZE)];
+		uint8_t cobsPacket[ILLUMINATIR_COBS_PACKET_MAXSIZE];
 		uint8_t cobsPacket_size = sizeof(cobsPacket);
 		illuminatir_error_t err = illuminatir_cobs_build_offsetArray( cobsPacket, &cobsPacket_size, blockStart, &ledValues[blockStart], blockLen );
 		if( err != ILLUMINATIR_ERROR_NONE ) {
@@ -448,7 +448,10 @@ static bool updateLedValues( void )
 	return true; // iterated once over every LED value
 }
 
-#define LEDVALUE_SCRUBBING_SIZE 8
+
+// Some IR receivers don't seem to like long runs of static data(?) - keeping scrubbing size low helps.
+#define LEDVALUE_SCRUBBING_SIZE 4
+
 
 int main( void )
 {

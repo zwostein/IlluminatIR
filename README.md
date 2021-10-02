@@ -1,6 +1,6 @@
 # IlluminatIR
 
-IlluminatIR synchronizes lighting devices (and possibly other gadgets) via an infrared serial protocol.
+IlluminatIR synchronizes lighting devices (and possibly other gadgets) in real-time via a unidirectional infrared serial protocol.
 
 This is the firmware for ATmega32U4 microcontrollers implementing the transmitter.  
 The infrared transmitter is connected to a host computer via USB and acts as a HID device.
