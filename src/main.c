@@ -327,7 +327,7 @@ void parseLine( char * line )
 		if( values_size < 0 ) { print_readHex_error( values_size ); return; }
 		uint8_t cobsPacket[ILLUMINATIR_COBS_PACKET_MAXSIZE];
 		uint8_t cobsPacket_size = sizeof(cobsPacket);
-		illuminatir_error_t err = illuminatir_cobs_build_config( cobsPacket, &cobsPacket_size, key, strlen(key), values, values_size );
+		illuminatir_error_t err = illuminatir_rand_cobs_build_config( cobsPacket, &cobsPacket_size, key, strlen(key), values, values_size );
 		if( err != ILLUMINATIR_ERROR_NONE ) {
 			printf_P( PSTR("Could not build packet: %S\n"), illuminatir_error_toString_P(err) );
 			return;
@@ -426,7 +426,7 @@ static bool updateLedValues( void )
 //		printf_P( PSTR("\tblockStart: %u, blockEnd:%u\n"), blockStart, blockEnd );
 		uint8_t cobsPacket[ILLUMINATIR_COBS_PACKET_MAXSIZE];
 		uint8_t cobsPacket_size = sizeof(cobsPacket);
-		illuminatir_error_t err = illuminatir_cobs_build_offsetArray( cobsPacket, &cobsPacket_size, blockStart, &ledValues[blockStart], blockLen );
+		illuminatir_error_t err = illuminatir_rand_cobs_build_offsetArray( cobsPacket, &cobsPacket_size, blockStart, &ledValues[blockStart], blockLen );
 		if( err != ILLUMINATIR_ERROR_NONE ) {
 			printf_P( PSTR("Could not build packet: %S\n"), illuminatir_error_toString_P(err) );
 			return false;
@@ -449,7 +449,7 @@ static bool updateLedValues( void )
 }
 
 
-// Some IR receivers don't seem to like long runs of static data(?) - keeping scrubbing size low helps.
+
 #define LEDVALUE_SCRUBBING_SIZE 4
 
 
